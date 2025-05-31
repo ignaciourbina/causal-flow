@@ -150,7 +150,7 @@ export default function PathDiagram({ variables, numPeriods, paths, onPathsChang
 
   // Basic intersection with rectangle, simplified
   function getIntersectionPoint(lineStartX: number, lineStartY: number, lineEndX: number, lineEndY: number, rectNode: NodePosition) {
-    const { x, y, width, height } = rectNode; // Destructure rectNode properties
+    const { x, y, width, height } = rectNode; 
 
     const dx = lineEndX - lineStartX;
     const dy = lineEndY - lineStartY;
@@ -191,25 +191,22 @@ export default function PathDiagram({ variables, numPeriods, paths, onPathsChang
         }
     }
     
-    // If an intersection was found along the line segment before reaching the rectangle's center
-    if (t < Infinity && t < 1) { // t < 1 ensures intersection is within the segment from start to original end
+    if (t < Infinity && t < 1) { 
       return { x: intersectX, y: intersectY };
     }
 
-    // Fallback: A simpler approach: just shorten the line slightly if it's to a node
-    // and no edge intersection was found better.
     const dist = Math.sqrt(dx*dx + dy*dy);
-    if (dist === 0) return {x: lineEndX, y: lineEndY}; // Points are identical
+    if (dist === 0) return {x: lineEndX, y: lineEndY}; 
     
-    const offset = 10; // offset from node edge (like padding for the arrow tip)
+    const offset = 10; 
     
-    if (rectNode && dist > offset) { // Use rectNode here
+    if (rectNode && dist > offset) {
         return {
             x: lineEndX - (dx / dist) * offset,
             y: lineEndY - (dy / dist) * offset,
         };
     }
-    return {x: lineEndX, y: lineEndY}; // Default to original end point if not shortening
+    return {x: lineEndX, y: lineEndY}; 
   }
 
 
@@ -224,11 +221,11 @@ export default function PathDiagram({ variables, numPeriods, paths, onPathsChang
   return (
     <div 
       ref={diagramRef} 
-      className="w-full h-full overflow-auto relative bg-background p-4 rounded-md border"
+      className="w-full h-full overflow-auto relative bg-background p-2 sm:p-4 rounded-md border"
       onMouseMove={handleDiagramMouseMove}
       onClick={handleDiagramClick}
     >
-      <div className="grid gap-x-8 gap-y-4" style={{ gridTemplateColumns: `repeat(${numPeriods}, minmax(150px, 1fr))` }}>
+      <div className="grid gap-x-2 sm:gap-x-4 md:gap-x-8 gap-y-2 sm:gap-y-4" style={{ gridTemplateColumns: `repeat(${numPeriods}, minmax(150px, 1fr))` }}>
         {Array.from({ length: numPeriods }).map((_, periodIndex) => (
           <div key={`period-${periodIndex}`} className="flex flex-col items-center">
             <h3 className="text-sm font-semibold text-muted-foreground mb-2 p-1 bg-secondary rounded-sm">
