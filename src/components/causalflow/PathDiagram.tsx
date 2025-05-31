@@ -148,66 +148,77 @@ export default function PathDiagram({ variables, numPeriods, paths, onPathsChang
     }
   };
 
-  // Basic intersection with rectangle, simplified
+  // Calculates the intersection point of a line (from lineStartX,Y to lineEndX,Y) with a rectangle (rectNode).
+  // The line is then shortened so the arrowhead tip (defined by SVG marker) touches the rectNode's border.
   function getIntersectionPoint(lineStartX: number, lineStartY: number, lineEndX: number, lineEndY: number, rectNode: NodePosition) {
     const { x, y, width, height } = rectNode; 
-
     const dx = lineEndX - lineStartX;
     const dy = lineEndY - lineStartY;
 
-    let t = Infinity;
-    let intersectX = lineEndX, intersectY = lineEndY;
+    let t = Infinity; // Parametric value for intersection (0 <= t <= 1 for segment)
+    let intersectX = lineEndX; // Default to target center if no border intersection
+    let intersectY = lineEndY;
 
-    // Top edge
+    // Check intersection with top edge
     if (dy !== 0) {
-        const currentT = (y - lineStartY) / dy;
-        if (currentT >= 0 && currentT <=1) {
-            const ix = lineStartX + currentT * dx;
-            if (ix >= x && ix <= x + width && currentT < t) { t = currentT; intersectX = ix; intersectY = y; }
-        }
+      const currentT = (y - lineStartY) / dy;
+      if (currentT >= 0 && currentT <= 1) {
+        const ix = lineStartX + currentT * dx;
+        if (ix >= x && ix <= x + width && currentT < t) { t = currentT; intersectX = ix; intersectY = y; }
+      }
     }
-    // Bottom edge
+    // Check intersection with bottom edge
     if (dy !== 0) {
-        const currentT = (y + height - lineStartY) / dy;
-         if (currentT >= 0 && currentT <=1) {
-            const ix = lineStartX + currentT * dx;
-            if (ix >= x && ix <= x + width && currentT < t) { t = currentT; intersectX = ix; intersectY = y + height; }
-        }
+      const currentT = (y + height - lineStartY) / dy;
+      if (currentT >= 0 && currentT <= 1) {
+        const ix = lineStartX + currentT * dx;
+        if (ix >= x && ix <= x + width && currentT < t) { t = currentT; intersectX = ix; intersectY = y + height; }
+      }
     }
-    // Left edge
+    // Check intersection with left edge
     if (dx !== 0) {
-        const currentT = (x - lineStartX) / dx;
-        if (currentT >= 0 && currentT <=1) {
-            const iy = lineStartY + currentT * dy;
-            if (iy >= y && iy <= y + height && currentT < t) { t = currentT; intersectX = x; intersectY = iy; }
-        }
+      const currentT = (x - lineStartX) / dx;
+      if (currentT >= 0 && currentT <= 1) {
+        const iy = lineStartY + currentT * dy;
+        if (iy >= y && iy <= y + height && currentT < t) { t = currentT; intersectX = x; intersectY = iy; }
+      }
     }
-    // Right edge
+    // Check intersection with right edge
     if (dx !== 0) {
-        const currentT = (x + width - lineStartX) / dx;
-        if (currentT >= 0 && currentT <=1) {
-            const iy = lineStartY + currentT * dy;
-            if (iy >= y && iy <= y + height && currentT < t) { t = currentT; intersectX = x + width; intersectY = iy; }
-        }
+      const currentT = (x + width - lineStartX) / dx;
+      if (currentT >= 0 && currentT <= 1) {
+        const iy = lineStartY + currentT * dy;
+        if (iy >= y && iy <= y + height && currentT < t) { t = currentT; intersectX = x + width; intersectY = iy; }
+      }
     }
     
-    if (t < Infinity && t < 1) { 
+    // If an intersection point on the border was found along the segment
+    if (t < Infinity) { 
+      // This point is on the border. The SVG marker's refX will handle tip placement.
       return { x: intersectX, y: intersectY };
     }
 
-    const dist = Math.sqrt(dx*dx + dy*dy);
-    if (dist === 0) return {x: lineEndX, y: lineEndY}; 
+    // Fallback: No clear intersection on the border segment from source center to target center.
+    // This might happen if source center is inside target node, or nodes are extremely close/overlapping.
+    const distToTargetCenter = Math.sqrt(dx*dx + dy*dy);
+    if (distToTargetCenter === 0) return {x: lineEndX, y: lineEndY}; // Source and target center are the same.
     
-    const offset = 10; 
-    
-    // A simpler approach: just shorten the line slightly if it's to a node
-    if (rectNode && dist > offset) {
+    const fallbackOffset = 12; // Offset from the target node's center
+
+    if (distToTargetCenter > fallbackOffset) {
+        // Retract from the target's center by fallbackOffset
         return {
-            x: lineEndX - (dx / dist) * offset,
-            y: lineEndY - (dy / dist) * offset,
+            x: lineEndX - (dx / distToTargetCenter) * fallbackOffset,
+            y: lineEndY - (dy / distToTargetCenter) * fallbackOffset,
         };
     }
-    return {x: lineEndX, y: lineEndY}; 
+    // If target center is closer than fallbackOffset (nodes are very close or overlapping)
+    // aim for a point 80% of the way from source center to target center.
+    // This avoids ending up at the exact center which can look odd with arrowheads.
+    return {
+      x: lineStartX + dx * 0.8, 
+      y: lineStartY + dy * 0.8,
+    };
   }
 
 
