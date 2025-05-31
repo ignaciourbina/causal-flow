@@ -19,7 +19,7 @@ interface DrawingPathState {
   currentMousePos: { x: number; y: number } | null;
 }
 
-const MAX_LANES = 3;
+const MAX_LANES = 3; // Retained for potential future use, but not for primary offset calculation now
 const LANE_SEPARATION = 15; 
 const BASE_ELBOW_OFFSET = 20; 
 
@@ -112,7 +112,7 @@ export default function PathDiagram({ variables, numPeriods, paths, onPathsChang
         
         const isSkipping = Math.abs(fromIdx - toIdx) > 1;
 
-        if (!isSkipping) continue; // Only apply lanes to skipping paths
+        if (!isSkipping) continue; 
         if (propsMap.has(path.id)) continue; 
 
         const periodIndex = path.from.periodIndex;
@@ -126,7 +126,7 @@ export default function PathDiagram({ variables, numPeriods, paths, onPathsChang
             rp.to.periodIndex === periodIndex && 
             variables.findIndex(v => v.id === rp.from.variableId) !== -1 && 
             variables.findIndex(v => v.id === rp.to.variableId) !== -1 &&
-            Math.abs(variables.findIndex(v => v.id === rp.from.variableId) - variables.findIndex(v => v.id === rp.to.variableId)) > 1 // Ensure reciprocal is also skipping
+            Math.abs(variables.findIndex(v => v.id === rp.from.variableId) - variables.findIndex(v => v.id === rp.to.variableId)) > 1
         );
 
         if (reciprocalPath && !propsMap.has(reciprocalPath.id)) {
@@ -134,13 +134,13 @@ export default function PathDiagram({ variables, numPeriods, paths, onPathsChang
             const primaryPath = pathIsPrimary ? path : reciprocalPath;
             const secondaryPath = pathIsPrimary ? reciprocalPath : path;
 
-            propsMap.set(primaryPath.id, { direction: 'right', lane: counters.right % MAX_LANES });
+            propsMap.set(primaryPath.id, { direction: 'right', lane: counters.right });
             counters.right++;
             
-            propsMap.set(secondaryPath.id, { direction: 'left', lane: counters.left % MAX_LANES });
+            propsMap.set(secondaryPath.id, { direction: 'left', lane: counters.left });
             counters.left++;
-        } else if (!reciprocalPath) { // Only assign to non-reciprocal skipping paths if they don't have a partner
-            propsMap.set(path.id, { direction: 'right', lane: counters.right % MAX_LANES });
+        } else if (!reciprocalPath) { 
+            propsMap.set(path.id, { direction: 'right', lane: counters.right });
             counters.right++;
         }
     }
@@ -173,15 +173,22 @@ export default function PathDiagram({ variables, numPeriods, paths, onPathsChang
       const toNode = clickedNodePosition;
 
       if (fromNode.nodeId === toNode.nodeId) {
-        toast({ title: "Invalid Path", description: "Cannot connect a variable to itself in the same period instance.", variant: "destructive" });
-        setDrawingPath({ startNode: null, currentMousePos: null });
-        return;
+        // Allow self-loops if they are longitudinal (across periods)
+        if (fromNode.periodIndex === toNode.periodIndex) {
+          toast({ title: "Invalid Path", description: "Cannot connect a variable to itself in the same period instance.", variant: "destructive" });
+          setDrawingPath({ startNode: null, currentMousePos: null });
+          return;
+        }
       }
 
+
       if (toNode.periodIndex < fromNode.periodIndex || toNode.periodIndex > fromNode.periodIndex + 1) {
-        toast({ title: "Invalid Path", description: "Connections allowed only to variables in the same time period or the immediate next period.", variant: "destructive" });
-        setDrawingPath({ startNode: null, currentMousePos: null });
-        return;
+         // Allow self-loops across any number of periods, but non-self only to same or next
+        if (fromNode.variableId !== toNode.variableId) {
+            toast({ title: "Invalid Path", description: "Connections allowed only to variables in the same time period or the immediate next period.", variant: "destructive" });
+            setDrawingPath({ startNode: null, currentMousePos: null });
+            return;
+        }
       }
       
       const newPath: Path = {
@@ -236,33 +243,35 @@ export default function PathDiagram({ variables, numPeriods, paths, onPathsChang
       }
     };
 
+    // Top edge
     if (dy !== 0) { 
       const currentT = (y - lineStartY) / dy;
       checkEdge(currentT, lineStartX + currentT * dx, y, lineStartX + currentT * dx >= x && lineStartX + currentT * dx <= x + width);
     }
+    // Bottom edge
     if (dy !== 0) { 
       const currentT = (y + height - lineStartY) / dy;
       checkEdge(currentT, lineStartX + currentT * dx, y + height, lineStartX + currentT * dx >= x && lineStartX + currentT * dx <= x + width);
     }
+    // Left edge
     if (dx !== 0) { 
       const currentT = (x - lineStartX) / dx;
       checkEdge(currentT, x, lineStartY + currentT * dy, lineStartY + currentT * dy >= y && lineStartY + currentT * dy <= y + height);
     }
+    // Right edge
     if (dx !== 0) { 
       const currentT = (x + width - lineStartX) / dx;
       checkEdge(currentT, x + width, lineStartY + currentT * dy, lineStartY + currentT * dy >= y && lineStartY + currentT * dy <= y + height);
     }
     
-    if (t < Infinity && t <= 1) { // Check t <= 1 to ensure intersection is on the segment or at the end
+    if (t < Infinity && t <= 1) { 
         return { x: intersectX, y: intersectY };
     }
 
-    // Fallback if no intersection found on segment (e.g. source is inside target, or very close)
     const distToTargetCenter = Math.sqrt(dx*dx + dy*dy);
     if (distToTargetCenter === 0) return {x: lineEndX, y: lineEndY}; 
     
-    // Slightly increased fallback offset
-    const fallbackOffset = 10; // was 5, then 15, now 10 for better general appearance
+    const fallbackOffset = 10; 
 
     if (distToTargetCenter > fallbackOffset) {
         return {
@@ -270,7 +279,6 @@ export default function PathDiagram({ variables, numPeriods, paths, onPathsChang
             y: lineEndY - (dy / distToTargetCenter) * fallbackOffset,
         };
     }
-    // If nodes are extremely close, aim for a point part-way to the target center
     return {
       x: lineStartX + dx * 0.75, 
       y: lineStartY + dy * 0.75,
@@ -305,9 +313,21 @@ export default function PathDiagram({ variables, numPeriods, paths, onPathsChang
             {variables.map(variable => {
               const nodeId = `${variable.id}-p${periodIndex}`;
               const isDrawingSource = drawingPath.startNode?.nodeId === nodeId;
-              const isValidTarget = drawingPath.startNode && 
-                                    (periodIndex === drawingPath.startNode.periodIndex || periodIndex === drawingPath.startNode.periodIndex + 1) &&
-                                    nodeId !== drawingPath.startNode.nodeId;
+              
+              let isValidTarget = false;
+              if (drawingPath.startNode) {
+                const startNodeInfo = drawingPath.startNode;
+                const targetIsSameNode = startNodeInfo.variableId === variable.id && startNodeInfo.periodIndex === periodIndex;
+                
+                if (targetIsSameNode) {
+                  isValidTarget = false; // Cannot connect to itself in same period
+                } else if (startNodeInfo.variableId === variable.id) { // Self-loop to different period
+                  isValidTarget = periodIndex > startNodeInfo.periodIndex; // Allow self-loops forward in time
+                } else { // Connection to a different variable
+                   isValidTarget = periodIndex === startNodeInfo.periodIndex || periodIndex === startNodeInfo.periodIndex + 1;
+                }
+              }
+
 
               return (
                 <VariableNode
@@ -342,28 +362,22 @@ export default function PathDiagram({ variables, numPeriods, paths, onPathsChang
           const isSkipping = isCrossSectional && fromVariableIndex !== -1 && toVariableIndex !== -1 && Math.abs(fromVariableIndex - toVariableIndex) > 1;
 
           if (isSkipping) {
-            const props = pathCustomProps.get(path.id);
-            if (!props) { 
-                // Fallback for skipping paths if props somehow not found (e.g., lone skipping path not covered by a rule)
-                // This scenario should ideally be handled by pathCustomProps to default to 'right'
-                const {x: finalToX, y: finalToY} = getIntersectionPoint(fromNodePos.centerX, fromNodePos.centerY, toNodePos.centerX, toNodePos.centerY, toNodePos);
-                 return (
-                  <line
-                    key={path.id + "-fallback-skip"}
-                    x1={fromNodePos.centerX}
-                    y1={fromNodePos.centerY}
-                    x2={finalToX}
-                    y2={finalToY}
-                    className="stroke-primary"
-                    strokeWidth="2"
-                    markerEnd="url(#arrowhead)"
-                  />
-                );
+            let props = pathCustomProps.get(path.id);
+            let direction: 'left' | 'right' = 'right';
+            let lane = 0;
+
+            if (props) {
+                direction = props.direction;
+                lane = props.lane;
+            } else {
+                // Fallback for skipping path if props somehow not found (should ideally not happen)
+                // Default to a 'right' direction, lane 0 elbow
+                console.warn(`Path props not found for skipping path ${path.id}, using default elbow.`);
             }
 
-            const { direction, lane } = props;
             const directionMultiplier = direction === 'left' ? -1 : 1;
-            const laneSpecificOffset = BASE_ELBOW_OFFSET + (lane % MAX_LANES) * LANE_SEPARATION;
+            // Use the direct lane index for progressively larger offsets
+            const laneSpecificOffset = BASE_ELBOW_OFFSET + lane * LANE_SEPARATION;
 
             const p0x = (direction === 'right') ? (fromNodePos.x + fromNodePos.width) : fromNodePos.x;
             const p0y = fromNodePos.centerY;
