@@ -54,7 +54,7 @@ export default function PathDiagram({ variables, numPeriods, paths, onPathsChang
         }
       }
     });
-    setNodePositions(new Map(newPositions)); // Create new Map instance to trigger re-render
+    setNodePositions(new Map(newPositions));
   }, [variables, numPeriods]);
 
   useEffect(() => {
@@ -65,7 +65,6 @@ export default function PathDiagram({ variables, numPeriods, paths, onPathsChang
     if (diagramRef.current) {
       resizeObserver.observe(diagramRef.current);
     }
-    // Observe individual nodes if necessary, or rely on parent resize
     nodeRefs.current.forEach(nodeEl => {
       if (nodeEl) resizeObserver.observe(nodeEl);
     });
@@ -98,7 +97,6 @@ export default function PathDiagram({ variables, numPeriods, paths, onPathsChang
       const fromNode = drawingPath.startNode;
       const toNode = clickedNodePosition;
 
-      // Validation
       if (fromNode.nodeId === toNode.nodeId) {
         toast({ title: "Invalid Path", description: "Cannot connect a variable to itself in the same period instance.", variant: "destructive" });
         setDrawingPath({ startNode: null, currentMousePos: null });
@@ -117,7 +115,6 @@ export default function PathDiagram({ variables, numPeriods, paths, onPathsChang
         to: { variableId: toNode.variableId, periodIndex: toNode.periodIndex },
       };
 
-      // Check for duplicate paths
       const pathExists = paths.some(p => 
         p.from.variableId === newPath.from.variableId &&
         p.from.periodIndex === newPath.from.periodIndex &&
@@ -141,80 +138,61 @@ export default function PathDiagram({ variables, numPeriods, paths, onPathsChang
   };
   
   const handleDiagramClick = (event: React.MouseEvent) => {
-    // If clicking on the diagram background while drawing, cancel drawing
     if (drawingPath.startNode && event.target === diagramRef.current) {
       setDrawingPath({ startNode: null, currentMousePos: null });
       toast({ title: "Path Drawing Cancelled", description: "Clicked on background." });
     }
   };
 
-  // Calculates the intersection point of a line (from lineStartX,Y to lineEndX,Y) with a rectangle (rectNode).
-  // The line is then shortened so the arrowhead tip (defined by SVG marker) touches the rectNode's border.
   function getIntersectionPoint(lineStartX: number, lineStartY: number, lineEndX: number, lineEndY: number, rectNode: NodePosition) {
     const { x, y, width, height } = rectNode; 
     const dx = lineEndX - lineStartX;
     const dy = lineEndY - lineStartY;
 
-    let t = Infinity; // Parametric value for intersection (0 <= t <= 1 for segment)
-    let intersectX = lineEndX; // Default to target center if no border intersection
+    let t = Infinity; 
+    let intersectX = lineEndX; 
     let intersectY = lineEndY;
 
-    // Check intersection with top edge
-    if (dy !== 0) {
+    const checkEdge = (edgeT: number, ix: number, iy: number, condition: boolean) => {
+      if (edgeT >= 0 && edgeT <= 1 && condition && edgeT < t) {
+        t = edgeT;
+        intersectX = ix;
+        intersectY = iy;
+      }
+    };
+
+    if (dy !== 0) { // Top edge
       const currentT = (y - lineStartY) / dy;
-      if (currentT >= 0 && currentT <= 1) {
-        const ix = lineStartX + currentT * dx;
-        if (ix >= x && ix <= x + width && currentT < t) { t = currentT; intersectX = ix; intersectY = y; }
-      }
+      checkEdge(currentT, lineStartX + currentT * dx, y, lineStartX + currentT * dx >= x && lineStartX + currentT * dx <= x + width);
     }
-    // Check intersection with bottom edge
-    if (dy !== 0) {
+    if (dy !== 0) { // Bottom edge
       const currentT = (y + height - lineStartY) / dy;
-      if (currentT >= 0 && currentT <= 1) {
-        const ix = lineStartX + currentT * dx;
-        if (ix >= x && ix <= x + width && currentT < t) { t = currentT; intersectX = ix; intersectY = y + height; }
-      }
+      checkEdge(currentT, lineStartX + currentT * dx, y + height, lineStartX + currentT * dx >= x && lineStartX + currentT * dx <= x + width);
     }
-    // Check intersection with left edge
-    if (dx !== 0) {
+    if (dx !== 0) { // Left edge
       const currentT = (x - lineStartX) / dx;
-      if (currentT >= 0 && currentT <= 1) {
-        const iy = lineStartY + currentT * dy;
-        if (iy >= y && iy <= y + height && currentT < t) { t = currentT; intersectX = x; intersectY = iy; }
-      }
+      checkEdge(currentT, x, lineStartY + currentT * dy, lineStartY + currentT * dy >= y && lineStartY + currentT * dy <= y + height);
     }
-    // Check intersection with right edge
-    if (dx !== 0) {
+    if (dx !== 0) { // Right edge
       const currentT = (x + width - lineStartX) / dx;
-      if (currentT >= 0 && currentT <= 1) {
-        const iy = lineStartY + currentT * dy;
-        if (iy >= y && iy <= y + height && currentT < t) { t = currentT; intersectX = x + width; intersectY = iy; }
-      }
+      checkEdge(currentT, x + width, lineStartY + currentT * dy, lineStartY + currentT * dy >= y && lineStartY + currentT * dy <= y + height);
     }
     
-    // If an intersection point on the border was found along the segment
-    if (t < Infinity) { 
-      // This point is on the border. The SVG marker's refX will handle tip placement.
-      return { x: intersectX, y: intersectY };
+    if (t < Infinity && t <= 1) { // Ensure intersection is within the segment [start, end]
+        return { x: intersectX, y: intersectY };
     }
 
-    // Fallback: No clear intersection on the border segment from source center to target center.
-    // This might happen if source center is inside target node, or nodes are extremely close/overlapping.
     const distToTargetCenter = Math.sqrt(dx*dx + dy*dy);
-    if (distToTargetCenter === 0) return {x: lineEndX, y: lineEndY}; // Source and target center are the same.
+    if (distToTargetCenter === 0) return {x: lineEndX, y: lineEndY}; 
     
-    const fallbackOffset = 12; // Offset from the target node's center
+    const fallbackOffset = 12; 
 
     if (distToTargetCenter > fallbackOffset) {
-        // Retract from the target's center by fallbackOffset
         return {
             x: lineEndX - (dx / distToTargetCenter) * fallbackOffset,
             y: lineEndY - (dy / distToTargetCenter) * fallbackOffset,
         };
     }
-    // If target center is closer than fallbackOffset (nodes are very close or overlapping)
-    // aim for a point 80% of the way from source center to target center.
-    // This avoids ending up at the exact center which can look odd with arrowheads.
     return {
       x: lineStartX + dx * 0.8, 
       y: lineStartY + dy * 0.8,
@@ -237,7 +215,10 @@ export default function PathDiagram({ variables, numPeriods, paths, onPathsChang
       onMouseMove={handleDiagramMouseMove}
       onClick={handleDiagramClick}
     >
-      <div className="grid gap-x-1 sm:gap-x-2 md:gap-x-4 lg:gap-x-8 gap-y-1 sm:gap-y-2 md:gap-y-4" style={{ gridTemplateColumns: `repeat(${numPeriods}, minmax(150px, 1fr))` }}>
+      <div 
+        className="grid gap-x-1 sm:gap-x-2 md:gap-x-4 lg:gap-x-8 gap-y-1 sm:gap-y-2 md:gap-y-4" 
+        style={{ gridTemplateColumns: `repeat(${numPeriods}, minmax(150px, 1fr))` }}
+      >
         {Array.from({ length: numPeriods }).map((_, periodIndex) => (
           <div key={`period-${periodIndex}`} className="flex flex-col items-center py-4">
             <h3 className="text-sm font-semibold text-muted-foreground mb-2 p-1 bg-secondary rounded-sm">
@@ -275,21 +256,56 @@ export default function PathDiagram({ variables, numPeriods, paths, onPathsChang
           const fromNodePos = nodePositions.get(`${path.from.variableId}-p${path.from.periodIndex}`);
           const toNodePos = nodePositions.get(`${path.to.variableId}-p${path.to.periodIndex}`);
           if (!fromNodePos || !toNodePos) return null;
-          
-          const {x: finalToX, y: finalToY} = getIntersectionPoint(fromNodePos.centerX, fromNodePos.centerY, toNodePos.centerX, toNodePos.centerY, toNodePos);
 
-          return (
-            <line
-              key={path.id}
-              x1={fromNodePos.centerX}
-              y1={fromNodePos.centerY}
-              x2={finalToX}
-              y2={finalToY}
-              className="stroke-primary"
-              strokeWidth="2"
-              markerEnd="url(#arrowhead)"
-            />
-          );
+          const fromVariableIndex = variables.findIndex(v => v.id === path.from.variableId);
+          const toVariableIndex = variables.findIndex(v => v.id === path.to.variableId);
+
+          const isCrossSectional = path.from.periodIndex === path.to.periodIndex;
+          const isSkipping = Math.abs(fromVariableIndex - toVariableIndex) > 1;
+
+          if (isCrossSectional && isSkipping) {
+            const elbowPathSideOffset = 30; // How far the elbow juts out (to the right)
+            
+            const p0x = fromNodePos.x + fromNodePos.width; // Exit from source's right edge
+            const p0y = fromNodePos.centerY;
+
+            const p1x = fromNodePos.x + fromNodePos.width + elbowPathSideOffset; // First turn point
+            const p1y = fromNodePos.centerY;
+
+            const p2x = p1x; // X-coordinate of the vertical segment
+            const p2y = toNodePos.centerY; // Y-coordinate aligns with target's center for second turn
+
+            // The final segment approaches the target node from its left side.
+            // Use getIntersectionPoint for the segment from (p2x, p2y) to target's left edge.
+            const {x: finalToX, y: finalToY} = getIntersectionPoint(p2x, p2y, toNodePos.x, toNodePos.centerY, toNodePos);
+            
+            const d = `M ${p0x} ${p0y} L ${p1x} ${p1y} L ${p2x} ${p2y} L ${finalToX} ${finalToY}`;
+            return (
+              <path
+                key={path.id}
+                d={d}
+                className="stroke-primary"
+                strokeWidth="2"
+                markerEnd="url(#arrowhead)"
+                fill="none"
+              />
+            );
+          } else {
+            // Standard straight line path
+            const {x: finalToX, y: finalToY} = getIntersectionPoint(fromNodePos.centerX, fromNodePos.centerY, toNodePos.centerX, toNodePos.centerY, toNodePos);
+            return (
+              <line
+                key={path.id}
+                x1={fromNodePos.centerX}
+                y1={fromNodePos.centerY}
+                x2={finalToX}
+                y2={finalToY}
+                className="stroke-primary"
+                strokeWidth="2"
+                markerEnd="url(#arrowhead)"
+              />
+            );
+          }
         })}
         {drawingPath.startNode && drawingPath.currentMousePos && (
            <line
@@ -300,11 +316,10 @@ export default function PathDiagram({ variables, numPeriods, paths, onPathsChang
               className="stroke-accent"
               strokeWidth="2"
               strokeDasharray="5,5"
-              markerEnd="url(#arrowhead)"
+              markerEnd="url(#arrowhead)" // Keep arrowhead for drawing preview
             />
         )}
       </svg>
     </div>
   );
 }
-
