@@ -30,6 +30,11 @@ export default function PathDiagram({ variables, numPeriods, paths, onPathsChang
   const nodeRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
   const [nodePositions, setNodePositions] = useState<Map<string, NodePosition>>(new Map());
   const [drawingPath, setDrawingPath] = useState<DrawingPathState>({ startNode: null, currentMousePos: null });
+  const renderedBidirectionalPairIds = useRef(new Set<string>());
+
+  useEffect(() => {
+    renderedBidirectionalPairIds.current.clear();
+  }, [paths, variables, numPeriods]);
 
   const updateNodePositions = useCallback(() => {
     if (!diagramRef.current) return;
@@ -88,7 +93,6 @@ export default function PathDiagram({ variables, numPeriods, paths, onPathsChang
         if (a.from.periodIndex !== b.from.periodIndex) {
             return a.from.periodIndex - b.from.periodIndex;
         }
-        // Consistent key for pairs (A-C and C-A map to "A-C")
         const keyAFrom = Math.min(variables.findIndex(v => v.id === a.from.variableId), variables.findIndex(v => v.id === a.to.variableId));
         const keyATo = Math.max(variables.findIndex(v => v.id === a.from.variableId), variables.findIndex(v => v.id === a.to.variableId));
         const keyA = `${keyAFrom}-${keyATo}`;
@@ -99,7 +103,6 @@ export default function PathDiagram({ variables, numPeriods, paths, onPathsChang
 
         if (keyA !== keyB) return keyA.localeCompare(keyB);
         
-        // If same pair, sort by from variable ID to distinguish A->C from C->A
         return a.from.variableId.localeCompare(b.from.variableId);
     });
 
@@ -110,7 +113,7 @@ export default function PathDiagram({ variables, numPeriods, paths, onPathsChang
 
         const fromIdx = variables.findIndex(v => v.id === path.from.variableId);
         const toIdx = variables.findIndex(v => v.id === path.to.variableId);
-        if (fromIdx === -1 || toIdx === -1) continue; // Variable not found
+        if (fromIdx === -1 || toIdx === -1) continue; 
         
         const isSkipping = Math.abs(fromIdx - toIdx) > 1;
 
@@ -124,12 +127,15 @@ export default function PathDiagram({ variables, numPeriods, paths, onPathsChang
             rp.id !== path.id && 
             rp.from.variableId === path.to.variableId &&
             rp.to.variableId === path.from.variableId &&
-            rp.from.periodIndex === periodIndex
+            rp.from.periodIndex === periodIndex &&
+            rp.to.periodIndex === periodIndex && // Ensure reciprocal is also skipping and cross-sectional
+            variables.findIndex(v => v.id === rp.from.variableId) !== -1 && // Ensure variables exist
+            variables.findIndex(v => v.id === rp.to.variableId) !== -1 &&
+            Math.abs(variables.findIndex(v => v.id === rp.from.variableId) - variables.findIndex(v => v.id === rp.to.variableId)) > 1
         );
 
         if (reciprocalPath && !propsMap.has(reciprocalPath.id)) {
-            // Pair found
-            const pathIsPrimary = path.from.variableId < path.to.variableId; // Arbitrary but stable way to assign primary
+            const pathIsPrimary = path.from.variableId < path.to.variableId; 
             const primaryPath = pathIsPrimary ? path : reciprocalPath;
             const secondaryPath = pathIsPrimary ? reciprocalPath : path;
 
@@ -139,11 +145,9 @@ export default function PathDiagram({ variables, numPeriods, paths, onPathsChang
             propsMap.set(secondaryPath.id, { direction: 'left', lane: counters.left % MAX_LANES });
             counters.left++;
         } else if (!reciprocalPath) {
-            // No reciprocal path, assign to right by default
             propsMap.set(path.id, { direction: 'right', lane: counters.right % MAX_LANES });
             counters.right++;
         }
-        // If reciprocalPath exists but was already processed, this path (current 'path') was the secondary in the pair and is now covered.
     }
     return propsMap;
   }, [paths, variables, numPeriods]);
@@ -174,8 +178,6 @@ export default function PathDiagram({ variables, numPeriods, paths, onPathsChang
       const toNode = clickedNodePosition;
 
       if (fromNode.nodeId === toNode.nodeId) {
-        // Allow self-loops in different periods, but not same instance.
-        // This condition is for the same node instance.
         toast({ title: "Invalid Path", description: "Cannot connect a variable to itself in the same period instance.", variant: "destructive" });
         setDrawingPath({ startNode: null, currentMousePos: null });
         return;
@@ -239,46 +241,41 @@ export default function PathDiagram({ variables, numPeriods, paths, onPathsChang
       }
     };
 
-    if (dy !== 0) { // Top edge
+    if (dy !== 0) { 
       const currentT = (y - lineStartY) / dy;
       checkEdge(currentT, lineStartX + currentT * dx, y, lineStartX + currentT * dx >= x && lineStartX + currentT * dx <= x + width);
     }
-    if (dy !== 0) { // Bottom edge
+    if (dy !== 0) { 
       const currentT = (y + height - lineStartY) / dy;
       checkEdge(currentT, lineStartX + currentT * dx, y + height, lineStartX + currentT * dx >= x && lineStartX + currentT * dx <= x + width);
     }
-    if (dx !== 0) { // Left edge
+    if (dx !== 0) { 
       const currentT = (x - lineStartX) / dx;
       checkEdge(currentT, x, lineStartY + currentT * dy, lineStartY + currentT * dy >= y && lineStartY + currentT * dy <= y + height);
     }
-    if (dx !== 0) { // Right edge
+    if (dx !== 0) { 
       const currentT = (x + width - lineStartX) / dx;
       checkEdge(currentT, x + width, lineStartY + currentT * dy, lineStartY + currentT * dy >= y && lineStartY + currentT * dy <= y + height);
     }
     
-    // If an intersection was found on the line segment between start and end, use it.
-    if (t < Infinity && t <= 1) {
+    if (t < Infinity && t <= 1) { // Check t <= 1 to ensure intersection is on the segment or at the end
         return { x: intersectX, y: intersectY };
     }
 
-    // Fallback: If no intersection found on the segment (e.g., start is inside rect, or line ends before hitting border),
-    // aim for the center of the target node and retract slightly if possible.
     const distToTargetCenter = Math.sqrt(dx*dx + dy*dy);
-    if (distToTargetCenter === 0) return {x: lineEndX, y: lineEndY}; // Start and end are the same
+    if (distToTargetCenter === 0) return {x: lineEndX, y: lineEndY}; 
     
-    const fallbackOffset = 12; // How much to retract from the center if no border intersection.
+    const fallbackOffset = 15; 
 
-    // If the line is long enough, retract by offset.
     if (distToTargetCenter > fallbackOffset) {
         return {
             x: lineEndX - (dx / distToTargetCenter) * fallbackOffset,
             y: lineEndY - (dy / distToTargetCenter) * fallbackOffset,
         };
     }
-    // If line is too short, aim for a point partway along the line to avoid arrow head completely inside.
     return {
-      x: lineStartX + dx * 0.8, // Take 80% of the way
-      y: lineStartY + dy * 0.8,
+      x: lineStartX + dx * 0.75, 
+      y: lineStartY + dy * 0.75,
     };
   }
 
@@ -334,25 +331,63 @@ export default function PathDiagram({ variables, numPeriods, paths, onPathsChang
           <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto" markerUnits="strokeWidth">
             <polygon points="0 0, 10 3.5, 0 7" className="fill-primary" />
           </marker>
+          <marker id="arrowhead-start" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto-start-reverse" markerUnits="strokeWidth">
+            <polygon points="0 0, 10 3.5, 0 7" className="fill-primary" />
+          </marker>
         </defs>
         {paths.map(path => {
+          if (renderedBidirectionalPairIds.current.has(path.id)) return null;
+
           const fromNodePos = nodePositions.get(`${path.from.variableId}-p${path.from.periodIndex}`);
           const toNodePos = nodePositions.get(`${path.to.variableId}-p${path.to.periodIndex}`);
           if (!fromNodePos || !toNodePos) return null;
 
+          const isCrossSectional = path.from.periodIndex === path.to.periodIndex;
           const fromVariableIndex = variables.findIndex(v => v.id === path.from.variableId);
           const toVariableIndex = variables.findIndex(v => v.id === path.to.variableId);
+          
+          const isContiguous = isCrossSectional && fromVariableIndex !== -1 && toVariableIndex !== -1 && Math.abs(fromVariableIndex - toVariableIndex) === 1;
+          const isSkipping = isCrossSectional && fromVariableIndex !== -1 && toVariableIndex !== -1 && Math.abs(fromVariableIndex - toVariableIndex) > 1;
 
-          const isCrossSectional = path.from.periodIndex === path.to.periodIndex;
-          const isSkipping = isCrossSectional && (fromVariableIndex !== -1 && toVariableIndex !== -1) && Math.abs(fromVariableIndex - toVariableIndex) > 1;
+          if (isContiguous) {
+            const reciprocalPath = paths.find(rp => 
+              rp.from.variableId === path.to.variableId && 
+              rp.to.variableId === path.from.variableId && 
+              rp.from.periodIndex === path.from.periodIndex &&
+              rp.to.periodIndex === path.to.periodIndex
+            );
+
+            if (reciprocalPath) {
+              renderedBidirectionalPairIds.current.add(path.id);
+              renderedBidirectionalPairIds.current.add(reciprocalPath.id);
+
+              const endPoint = getIntersectionPoint(fromNodePos.centerX, fromNodePos.centerY, toNodePos.centerX, toNodePos.centerY, toNodePos);
+              const startPoint = getIntersectionPoint(toNodePos.centerX, toNodePos.centerY, fromNodePos.centerX, fromNodePos.centerY, fromNodePos);
+              
+              return (
+                <line
+                  key={`${path.id}-bi`}
+                  x1={startPoint.x} 
+                  y1={startPoint.y}
+                  x2={endPoint.x}   
+                  y2={endPoint.y}
+                  className="stroke-primary"
+                  strokeWidth="2"
+                  markerStart="url(#arrowhead-start)"
+                  markerEnd="url(#arrowhead)"
+                />
+              );
+            }
+          }
+
 
           if (isSkipping) {
             const props = pathCustomProps.get(path.id);
-            if (!props) { // Fallback or error, draw straight line
+            if (!props) { 
                 const {x: finalToX, y: finalToY} = getIntersectionPoint(fromNodePos.centerX, fromNodePos.centerY, toNodePos.centerX, toNodePos.centerY, toNodePos);
                  return (
                   <line
-                    key={path.id + "-fallback"}
+                    key={path.id + "-fallback-skip"}
                     x1={fromNodePos.centerX}
                     y1={fromNodePos.centerY}
                     x2={finalToX}
@@ -391,7 +426,7 @@ export default function PathDiagram({ variables, numPeriods, paths, onPathsChang
               />
             );
           } else {
-            // Standard straight line path
+            // Standard straight line path (longitudinal or non-reciprocal contiguous cross-sectional)
             const {x: finalToX, y: finalToY} = getIntersectionPoint(fromNodePos.centerX, fromNodePos.centerY, toNodePos.centerX, toNodePos.centerY, toNodePos);
             return (
               <line
