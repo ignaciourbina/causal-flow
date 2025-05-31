@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
@@ -147,39 +148,10 @@ export default function PathDiagram({ variables, numPeriods, paths, onPathsChang
     }
   };
 
-  const getArrowPath = (fromX: number, fromY: number, toX: number, toY: number, fromNode: NodePosition, toNode?: NodePosition) => {
-    const dx = toX - fromX;
-    const dy = toY - fromY;
-    const angle = Math.atan2(dy, dx);
-    const arrowLength = 10; // Length of the arrowhead sides
-
-    let endX = toX;
-    let endY = toY;
-
-    if (toNode) { // Adjust end point to be on the edge of the target node
-        const intersect = getIntersectionPoint(fromX, fromY, toX, toY, toNode);
-        if(intersect) {
-          endX = intersect.x;
-          endY = intersect.y;
-        }
-    }
-    
-    const pointAX = endX - arrowLength * Math.cos(angle - Math.PI / 6);
-    const pointAY = endY - arrowLength * Math.sin(angle - Math.PI / 6);
-    const pointBX = endX - arrowLength * Math.cos(angle + Math.PI / 6);
-    const pointBY = endY - arrowLength * Math.sin(angle + Math.PI / 6);
-
-    return `M${fromX},${fromY} L${endX},${endY} M${pointAX},${pointAY} L${endX},${endY} L${pointBX},${pointBY}`;
-  };
-
   // Basic intersection with rectangle, simplified
   function getIntersectionPoint(lineStartX: number, lineStartY: number, lineEndX: number, lineEndY: number, rectNode: NodePosition) {
-    const { x, y, width, height, centerX, centerY } = rectNode;
+    const { x, y, width, height } = rectNode; // Destructure rectNode properties
 
-    // Check intersection with each of the 4 sides of the rectangle
-    // This is a simplified version, for more accuracy a full line-segment to rectangle-edge intersection is needed.
-    // This approach finds the intersection with lines extending from center to edge.
-    
     const dx = lineEndX - lineStartX;
     const dy = lineEndY - lineStartY;
 
@@ -219,22 +191,25 @@ export default function PathDiagram({ variables, numPeriods, paths, onPathsChang
         }
     }
     
-    // If no intersection found closer than original end point, use original end point (happens for internal points)
-    // But if t is still Infinity, it means something is wrong or line doesn't intersect box edge from start to end.
-    // This calculation is tricky. For now, we'll use a simpler center-to-center that stops a bit short.
-    
+    // If an intersection was found along the line segment before reaching the rectangle's center
+    if (t < Infinity && t < 1) { // t < 1 ensures intersection is within the segment from start to original end
+      return { x: intersectX, y: intersectY };
+    }
+
+    // Fallback: A simpler approach: just shorten the line slightly if it's to a node
+    // and no edge intersection was found better.
     const dist = Math.sqrt(dx*dx + dy*dy);
-    if (dist === 0) return {x: lineEndX, y: lineEndY};
-    const offset = 10; // offset from node edge
+    if (dist === 0) return {x: lineEndX, y: lineEndY}; // Points are identical
     
-    // A simpler approach: just shorten the line slightly if it's to a node
-    if (toNode && dist > offset) {
+    const offset = 10; // offset from node edge (like padding for the arrow tip)
+    
+    if (rectNode && dist > offset) { // Use rectNode here
         return {
             x: lineEndX - (dx / dist) * offset,
             y: lineEndY - (dy / dist) * offset,
         };
     }
-    return {x: lineEndX, y: lineEndY};
+    return {x: lineEndX, y: lineEndY}; // Default to original end point if not shortening
   }
 
 
@@ -323,3 +298,4 @@ export default function PathDiagram({ variables, numPeriods, paths, onPathsChang
     </div>
   );
 }
+
