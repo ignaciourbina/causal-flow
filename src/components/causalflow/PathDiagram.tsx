@@ -200,6 +200,7 @@ export default function PathDiagram({ variables, numPeriods, paths, onPathsChang
     
     const offset = 10; 
     
+    // A simpler approach: just shorten the line slightly if it's to a node
     if (rectNode && dist > offset) {
         return {
             x: lineEndX - (dx / dist) * offset,
@@ -221,13 +222,13 @@ export default function PathDiagram({ variables, numPeriods, paths, onPathsChang
   return (
     <div 
       ref={diagramRef} 
-      className="w-full h-full overflow-auto relative bg-background p-2 sm:p-4 rounded-md border"
+      className="w-full h-full overflow-auto relative bg-background p-1 sm:p-2 md:p-4 rounded-md border"
       onMouseMove={handleDiagramMouseMove}
       onClick={handleDiagramClick}
     >
-      <div className="grid gap-x-2 sm:gap-x-4 md:gap-x-8 gap-y-2 sm:gap-y-4" style={{ gridTemplateColumns: `repeat(${numPeriods}, minmax(150px, 1fr))` }}>
+      <div className="grid gap-x-1 sm:gap-x-2 md:gap-x-4 lg:gap-x-8 gap-y-1 sm:gap-y-2 md:gap-y-4" style={{ gridTemplateColumns: `repeat(${numPeriods}, minmax(150px, 1fr))` }}>
         {Array.from({ length: numPeriods }).map((_, periodIndex) => (
-          <div key={`period-${periodIndex}`} className="flex flex-col items-center">
+          <div key={`period-${periodIndex}`} className="flex flex-col items-center py-4">
             <h3 className="text-sm font-semibold text-muted-foreground mb-2 p-1 bg-secondary rounded-sm">
               Time Period {periodIndex + 1}
             </h3>
