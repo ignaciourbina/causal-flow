@@ -13,3 +13,7 @@ npm run export
 ```
 
 The exported site will be written to the `docs` folder which is ready to be served by GitHub Pages.
+
+A GitHub Actions workflow automatically builds and deploys the site when changes
+are pushed to the `main` branch. The workflow is defined in
+`.github/workflows/deploy.yml`.
