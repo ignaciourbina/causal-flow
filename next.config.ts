@@ -1,7 +1,11 @@
 import type {NextConfig} from 'next';
 
+const repo = 'causal-flow';
+
 const nextConfig: NextConfig = {
-  /* config options here */
+  output: 'export',
+  basePath: `/${repo}`,
+  assetPrefix: `/${repo}/`,
   typescript: {
     ignoreBuildErrors: true,
   },
