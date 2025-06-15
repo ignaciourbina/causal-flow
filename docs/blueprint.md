@@ -5,7 +5,7 @@
 - Variable Input: Add and name variables for the path diagram.
 - Period Definition: Define the number of time periods for variable measurement.
 - Tabular Display: Display a tabular layout showing variables measured at each time period.
-- Path Definition: Visually connect variables to define causal paths by clicking and dragging. A narrow line should appear between variable boxes, allowing connections only to variables in the same time period or the next. When the user clicks on one of the variables, then they move the mouse and an arrow moves with the mouse until they click again in a different box and a link is created and the arrow becomes static and is displayed.
+- Path Definition: Visually connect variables by clicking one node and then another. Links between different variables may target the same period or the immediate next period. Self-loops can span multiple periods. When skipping over other variables in a period, elbow connectors are placed in separate lanes to avoid overlap.
 - Lavaan Export: Download the defined path model in lavaan-compatible format.
 
 ## Style Guidelines:
