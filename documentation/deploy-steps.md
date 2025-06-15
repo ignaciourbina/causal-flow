@@ -6,7 +6,7 @@ This guide explains how to publish the static build of **CausalFlow** to GitHub 
    ```bash
    npm ci
    ```
-   Make sure you have Node.js installed. The command above installs all packages in a reproducible way.
+   Make sure you have **Node.js 20** or later installed. The command above installs all packages in a reproducible way.
 
 2. **Generate the static site**
    ```bash
