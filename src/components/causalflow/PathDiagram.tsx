@@ -332,7 +332,9 @@ export default function PathDiagram({ variables, numPeriods, paths, onPathsChang
               return (
                 <VariableNode
                   key={nodeId}
-                  ref={el => nodeRefs.current.set(nodeId, el)}
+                  ref={el => {
+                    nodeRefs.current.set(nodeId, el);
+                  }}
                   variableName={variable.name}
                   nodeId={nodeId}
                   onClick={() => handleNodeClick(variable.id, periodIndex)}
