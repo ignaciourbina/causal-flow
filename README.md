@@ -49,7 +49,8 @@ src/
 - **Static export** – `npm run export` writes a fully static site to the `docs/` folder. The included GitHub Actions workflow deploys this folder to GitHub Pages when you push to the `main` branch.
 - **Production build** – `npm run build` followed by `npm start` runs the Next.js production server.
 
-Deployment steps are described in [`documentation/deploy-steps.md`](documentation/deploy-steps.md).
+Deployment steps for GitHub Pages are described in [`documentation/deploy-steps.md`](documentation/deploy-steps.md).
+For instructions on publishing to a Hugging Face Space see [`Deployment/huggingface-spaces.md`](Deployment/huggingface-spaces.md).
 
 ## Customisation
 
