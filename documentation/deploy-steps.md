@@ -1,38 +1,73 @@
-# Deployment Steps for GitHub Pages
+# Deploying CausalFlow to GitHub Pages
 
-This guide explains how to publish the static build of **CausalFlow** to GitHub Pages so that it appears under `ignaciourbina.github.io`.
+This guide explains how to publish CausalFlow as a static site on GitHub Pages, making it accessible to research collaborators and the broader academic community.
 
-1. **Install dependencies**
-   ```bash
-   npm ci
-   ```
-   Make sure you have **Node.js 20** or later installed. The command above installs all packages in a reproducible way.
+## Why GitHub Pages?
 
-2. **Generate the static site**
-   ```bash
-   npm run export
-   ```
-   This runs `next export` and writes the output to the `docs` directory. The workflow in `.github/workflows/deploy.yml` expects the exported files in this folder.
+- **Free hosting** for static sites
+- **Persistent URLs** suitable for citation in publications
+- **Version control integration** for reproducible deployments
 
-3. **Commit the `docs` folder**
-   ```bash
-   git add docs
-   git commit -m "Export static site"
-   ```
-   The exported site must be committed so the GitHub Pages workflow can deploy it.
+## Prerequisites
 
-4. **Push to GitHub**
-   ```bash
-   git push origin main
-   ```
-   Pushing to the `main` branch triggers the GitHub Actions workflow defined in `.github/workflows/deploy.yml`.
+- Node.js 20 or later
+- Git installed and configured
+- GitHub repository access
 
-5. **Enable GitHub Pages**
-   In your repository settings on GitHub, open **Pages** and choose **GitHub Actions** as the source. This allows the workflow to publish the site automatically.
+## Deployment Steps
 
-6. **Access the site**
-   After the workflow runs, your app will be available at:
-   ```
-   https://ignaciourbina.github.io/causal-flow/
-   ```
-   If you prefer to host it directly at `ignaciourbina.github.io`, you can rename this repository to `ignaciourbina.github.io` or move the contents to a repository with that name.
+### 1. Install Dependencies
+
+```bash
+npm ci
+```
+
+### 2. Generate Static Site
+
+```bash
+npm run export
+```
+
+This creates a fully static version of the application in the `docs/` directory.
+
+### 3. Commit and Push
+
+```bash
+git add docs
+git commit -m "Export static site"
+git push origin main
+```
+
+### 4. Configure GitHub Pages
+
+1. Navigate to your repository on GitHub
+2. Go to **Settings** → **Pages**
+3. Under **Source**, select **GitHub Actions**
+
+The workflow in `.github/workflows/deploy.yml` handles automatic deployment on push to `main`.
+
+### 5. Access Your Site
+
+After the workflow completes, the application is available at:
+
+```
+https://ignaciourbina.github.io/causal-flow/
+```
+
+## Updating the Deployment
+
+Whenever you modify the application:
+
+1. Make your changes
+2. Run `npm run export`
+3. Commit and push the updated `docs/` folder
+
+The GitHub Actions workflow automatically redeploys the site.
+
+## Custom Domain (Optional)
+
+To use a custom domain:
+
+1. Add a `CNAME` file to the `docs/` folder with your domain
+2. Configure DNS settings with your domain provider
+3. Enable HTTPS in GitHub Pages settings
