@@ -4,6 +4,8 @@ const nextConfig: NextConfig = {
   /* config options here */
   output: 'export',
   distDir: 'docs',
+  basePath: '/causal-flow',
+  assetPrefix: '/causal-flow/',
   typescript: {
     ignoreBuildErrors: true,
   },
